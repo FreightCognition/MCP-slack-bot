@@ -1,0 +1,17 @@
+{
+  "name": "slack-bot",
+  "version": "1.0.0",
+  "description": "Slack bot for MyCarrierPortal integration",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
