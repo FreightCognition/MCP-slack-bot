@@ -1,6 +1,8 @@
+
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
+require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -24,7 +26,7 @@ app.post('/slack/commands', async (req, res) => {
       {
         params: { docketNumber: mcNumber },
         headers: {
-          Authorization: `Bearer NhKe7uxzpFwWjVaR-QDskK5mHnnTxREHLBAPt3s1F_Lr0WruwqcORtJ31LvsToYK7Pp5s89HaqbTZM6H_5yxsueCQGqJSd-mrezdm1ULH4MRm9FEF9lqgmN8nKa5cZKo9LRlt-Xkt3ldQIykWyj43O3l6WfG-kRym6HfheGS18Q0dUdkX0MYHq3C5NL11F-aQ4lWDhvxGsS7wusB_f8RWxAU2W1HaMv85QQbaTS__o_0b6LuW_v5g-Cn0azUaUcJq4KpLB9pTsNxyz1bTDLQRYpf9l2K6hdbQgneJKZr7NSlY1-vlbKZAAHtWTNCuZkQZL0SLE8PKAYhx1X9vLcrh92TGxtKBKf86dm5bz6Asn1jBTaic66a-aQZeKZBUtT5qcd-27PoQKM-1YeN7zGaa7OmFR0Qbz19WEwdF0QNnOY_8IFQgTLs_y50oAgqMmmmvxb6EJEtEYEmSr3kFnXjxXvg8nD1qRJMdrxOhSHWwKwQt9yTL7sYd_mDJfBYHEjnIHeMBYjPMYxKLyXdbIZffw`,
+          Authorization: `Bearer ${process.env.BEARER_TOKEN}`,
           'Content-Type': 'application/json'
         }
       }
@@ -90,7 +92,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Insurance:* 🔴 ${data.RiskAssessment.Insurance}`
+          text: `*Insurance:* 🚨 ${data.RiskAssessment.Insurance}`
         }
       },
       {
