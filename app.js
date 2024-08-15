@@ -1,4 +1,3 @@
-
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
@@ -9,6 +8,16 @@ const port = process.env.PORT || 8080;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+function getRiskLevelEmoji(points) {
+  if (points >= 0 && points <= 999) {
+    return '🟢';
+  } else if (points >= 1000 && points <= 9999) {
+    return '🟡';
+  } else {
+    return '🔴';
+  }
+}
 
 app.post('/slack/commands', async (req, res) => {
   const { text, response_url } = req.body;
@@ -54,7 +63,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Overall assessment:* :red_circle: ${data.RiskAssessment.Overall}`
+          text: `*Overall assessment:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.TotalPoints)} ${data.RiskAssessment.Overall}`
         }
       },
       {
@@ -73,7 +82,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Authority:* 🟢 ${data.RiskAssessment.Authority}`
+          text: `*Authority:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Authority.TotalPoints)} ${data.RiskAssessment.Authority}`
         }
       },
       {
@@ -92,7 +101,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Insurance:* 🚨 ${data.RiskAssessment.Insurance}`
+          text: `*Insurance:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Insurance.TotalPoints)} ${data.RiskAssessment.Insurance}`
         }
       },
       {
@@ -111,7 +120,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Operations:* 🟢 ${data.RiskAssessment.Operation}`
+          text: `*Operations:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Operation.TotalPoints)} ${data.RiskAssessment.Operation}`
         }
       },
       {
@@ -130,7 +139,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Safety:* 🟡 ${data.RiskAssessment.Safety}`
+          text: `*Safety:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Safety.TotalPoints)} ${data.RiskAssessment.Safety}`
         }
       },
       {
@@ -149,7 +158,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*MyCarrierProtect (Fraud, Double Brokering, and Performance):* 🔴 ${data.RiskAssessment.Other}`
+          text: `*MyCarrierProtect (Fraud, Double Brokering, and Performance):* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Other.TotalPoints)} ${data.RiskAssessment.Other}`
         }
       },
       {
@@ -180,37 +189,3 @@ app.post('/slack/commands', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
