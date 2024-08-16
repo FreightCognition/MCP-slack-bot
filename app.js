@@ -29,13 +29,19 @@ app.post('/slack/commands', async (req, res) => {
   const mcNumber = text.trim();
 
   try {
+    // Use the injected environment variable for the bearer token
+    const bearerToken = process.env.MCP_BEARER_TOKEN;
+    if (!bearerToken) {
+      throw new Error('Bearer token is not set');
+    }
+
     const response = await axios.post(
       'https://mycarrierpacketsapi-stage.azurewebsites.net/api/v1/Carrier/PreviewCarrier', 
       null, 
       {
         params: { docketNumber: mcNumber },
         headers: {
-          Authorization: `Bearer ${process.env.BEARER_TOKEN}`,
+          Authorization: `Bearer ${bearerToken}`,
           'Content-Type': 'application/json'
         }
       }
@@ -186,6 +192,10 @@ app.post('/slack/commands', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+module.exports = app;
