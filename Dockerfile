@@ -7,8 +7,11 @@ WORKDIR /usr/src/app
 # Copy application dependency manifests to the container image.
 COPY package*.json ./
 
-# Install all dependencies, including devDependencies.
-RUN npm install
+# Install production dependencies.
+RUN npm install --only=production
+
+# Install @google-cloud/secret-manager explicitly
+RUN npm install @google-cloud/secret-manager
 
 # Copy local code to the container image.
 COPY . .

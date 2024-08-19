@@ -1,13 +1,34 @@
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
-require('dotenv').config();
+const {SecretManagerServiceClient} = require('@google-cloud/secret-manager');
 
 const app = express();
 const port = process.env.PORT || 8080;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+
+const secretClient = new SecretManagerServiceClient();
+
+async function getSecret(secretName) {
+  const [version] = await secretClient.accessSecretVersion({
+    name: `projects/mcp-slack-bot/secrets/${secretName}/versions/latest`,
+  });
+  return version.payload.data.toString('utf8');
+}
+
+let BEARER_TOKEN;
+
+async function initializeSecrets() {
+  try {
+    BEARER_TOKEN = await getSecret('BEARER_TOKEN');
+    console.log('Secrets initialized successfully');
+  } catch (error) {
+    console.error('Error initializing secrets:', error);
+    process.exit(1);
+  }
+}
 
 function getRiskLevelEmoji(points) {
   if (points >= 0 && points <= 999) {
@@ -35,7 +56,7 @@ app.post('/slack/commands', async (req, res) => {
       {
         params: { docketNumber: mcNumber },
         headers: {
-          Authorization: `Bearer ${process.env.BEARER_TOKEN}`,
+          Authorization: `Bearer ${BEARER_TOKEN}`,
           'Content-Type': 'application/json'
         }
       }
@@ -186,6 +207,11 @@ app.post('/slack/commands', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+async function startServer() {
+  await initializeSecrets();
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}
+
+startServer();
