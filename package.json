@@ -4,21 +4,15 @@
   "description": "Slack bot for MyCarrierPortal integration",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "test": "jest"
+    "start": "node app.js"
   },
   "dependencies": {
     "axios": "^1.7.4",
     "body-parser": "^1.20.2",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "axios-mock-adapter": "^2.0.0",
-    "dotenv": "^16.4.5",
-    "jest": "^29.7.0",
-    "supertest": "^7.0.0"
-  }
+  "license": "ISC"
 }
