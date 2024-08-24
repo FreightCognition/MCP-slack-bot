@@ -31,13 +31,34 @@ async function initializeSecrets() {
 }
 
 function getRiskLevelEmoji(points) {
-  if (points >= 0 && points <= 999) {
+  if (points >= 0 && points <= 249) {
     return '🟢';
-  } else if (points >= 1000 && points <= 9999) {
+  } else if (points >= 250 && points <= 999) {
     return '🟡';
+  } else if (points >= 1000 && points <= 9999) {
+    return '🟠';
   } else {
     return '🔴';
   }
+}
+
+function getRiskLevel(points) {
+  if (points >= 0 && points <= 249) {
+    return 'Low';
+  } else if (points >= 250 && points <= 999) {
+    return 'Medium';
+  } else if (points >= 1000 && points <= 9999) {
+    return 'Review Required';
+  } else {
+    return 'Fail';
+  }
+}
+
+function getDetailsString(details) {
+  return Object.entries(details)
+    .filter(([key, value]) => key !== 'TotalPoints' && key !== 'OverallRating' && value !== 0)
+    .map(([key, value]) => `${key}: ${value} points`)
+    .join('\n');
 }
 
 app.post('/slack/commands', async (req, res) => {
@@ -84,7 +105,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Overall assessment:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.TotalPoints)} ${data.RiskAssessment.Overall}`
+          text: `*Overall assessment:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.TotalPoints)}`
         }
       },
       {
@@ -103,7 +124,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Authority:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Authority.TotalPoints)} ${data.RiskAssessment.Authority}`
+          text: `*Authority:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Authority.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Authority.TotalPoints)}`
         }
       },
       {
@@ -111,7 +132,7 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Risk Level: ${data.RiskAssessmentDetails.Authority.OverallRating} | Points: ${data.RiskAssessmentDetails.Authority.TotalPoints}`
+            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Authority.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Authority.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Authority)}`
           }
         ]
       },
@@ -122,7 +143,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Insurance:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Insurance.TotalPoints)} ${data.RiskAssessment.Insurance}`
+          text: `*Insurance:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Insurance.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Insurance.TotalPoints)}`
         }
       },
       {
@@ -130,7 +151,7 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Risk Level: ${data.RiskAssessmentDetails.Insurance.OverallRating} | Points: ${data.RiskAssessmentDetails.Insurance.TotalPoints}`
+            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Insurance.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Insurance.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Insurance)}`
           }
         ]
       },
@@ -141,7 +162,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Operations:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Operation.TotalPoints)} ${data.RiskAssessment.Operation}`
+          text: `*Operations:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Operation.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Operation.TotalPoints)}`
         }
       },
       {
@@ -149,7 +170,7 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Points: ${data.RiskAssessmentDetails.Operation.TotalPoints}`
+            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Operation.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Operation.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Operation)}`
           }
         ]
       },
@@ -160,7 +181,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Safety:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Safety.TotalPoints)} ${data.RiskAssessment.Safety}`
+          text: `*Safety:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Safety.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Safety.TotalPoints)}`
         }
       },
       {
@@ -168,7 +189,7 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Risk Level: ${data.RiskAssessmentDetails.Safety.OverallRating} | Points: ${data.RiskAssessmentDetails.Safety.TotalPoints}`
+            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Safety.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Safety.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Safety)}`
           }
         ]
       },
@@ -179,7 +200,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*MyCarrierProtect (Fraud, Double Brokering, and Performance):* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Other.TotalPoints)} ${data.RiskAssessment.Other}`
+          text: `*MyCarrierProtect (Fraud, Double Brokering, and Performance):* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Other.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Other.TotalPoints)}`
         }
       },
       {
@@ -187,7 +208,7 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Risk Level: ${data.RiskAssessmentDetails.Other.OverallRating} | Points: ${data.RiskAssessmentDetails.Other.TotalPoints}`
+            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Other.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Other.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Other)}`
           }
         ]
       }
