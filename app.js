@@ -71,6 +71,7 @@ app.post('/slack/commands', async (req, res) => {
   const mcNumber = text.trim();
 
   try {
+    console.log(`Fetching data for MC number: ${mcNumber}`);
     const response = await axios.post(
       'https://mycarrierpacketsapi-stage.azurewebsites.net/api/v1/Carrier/PreviewCarrier', 
       null, 
@@ -79,11 +80,18 @@ app.post('/slack/commands', async (req, res) => {
         headers: {
           Authorization: `Bearer ${BEARER_TOKEN}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 10000 // 10 seconds timeout
       }
     );
 
+    if (!response.data || response.data.length === 0) {
+      console.log(`No data found for MC number: ${mcNumber}`);
+      return res.send('No data found for the provided MC number.');
+    }
+
     const data = response.data[0];
+    console.log(`Data received for MC number: ${mcNumber}`, JSON.stringify(data, null, 2));
 
     const blocks = [
       {
@@ -98,14 +106,14 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*${data.CompanyName}*\nDOT: ${data.DotNumber} / MC: ${data.DocketNumber}`
+          text: `*${data.CompanyName || 'N/A'}*\nDOT: ${data.DotNumber || 'N/A'} / MC: ${data.DocketNumber || 'N/A'}`
         }
       },
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Overall assessment:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.TotalPoints)}`
+          text: `*Overall assessment:* ${getRiskLevelEmoji(data.RiskAssessmentDetails?.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails?.TotalPoints)}`
         }
       },
       {
@@ -113,118 +121,66 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Total Points: ${data.RiskAssessmentDetails.TotalPoints}`
+            text: `Total Points: ${data.RiskAssessmentDetails?.TotalPoints || 'N/A'}`
           }
         ]
       },
       {
         type: "divider"
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Authority:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Authority.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Authority.TotalPoints)}`
-        }
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Authority.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Authority.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Authority)}`
-          }
-        ]
-      },
-      {
-        type: "divider"
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Insurance:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Insurance.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Insurance.TotalPoints)}`
-        }
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Insurance.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Insurance.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Insurance)}`
-          }
-        ]
-      },
-      {
-        type: "divider"
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Operations:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Operation.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Operation.TotalPoints)}`
-        }
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Operation.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Operation.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Operation)}`
-          }
-        ]
-      },
-      {
-        type: "divider"
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Safety:* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Safety.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Safety.TotalPoints)}`
-        }
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Safety.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Safety.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Safety)}`
-          }
-        ]
-      },
-      {
-        type: "divider"
-      },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*MyCarrierProtect (Fraud, Double Brokering, and Performance):* ${getRiskLevelEmoji(data.RiskAssessmentDetails.Other.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails.Other.TotalPoints)}`
-        }
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `Risk Level: ${getRiskLevel(data.RiskAssessmentDetails.Other.TotalPoints)} | Points: ${data.RiskAssessmentDetails.Other.TotalPoints}\n${getDetailsString(data.RiskAssessmentDetails.Other)}`
-          }
-        ]
       }
     ];
+
+    // Add sections for each risk assessment category
+    const categories = ['Authority', 'Insurance', 'Operation', 'Safety', 'Other'];
+    categories.forEach(category => {
+      const categoryData = data.RiskAssessmentDetails?.[category];
+      if (categoryData) {
+        blocks.push(
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*${category}:* ${getRiskLevelEmoji(categoryData.TotalPoints)} ${getRiskLevel(categoryData.TotalPoints)}`
+            }
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `Risk Level: ${getRiskLevel(categoryData.TotalPoints)} | Points: ${categoryData.TotalPoints}\n${getDetailsString(categoryData)}`
+              }
+            ]
+          },
+          {
+            type: "divider"
+          }
+        );
+      }
+    });
 
     const slackResponse = {
       response_type: 'in_channel',
       blocks: blocks
     };
 
-    await axios.post(response_url, slackResponse);
+    console.log(`Sending Slack response for MC number: ${mcNumber}`);
+    await axios.post(response_url, slackResponse, { timeout: 5000 });
 
     res.send();
   } catch (error) {
     console.error('Error fetching carrier data:', error);
-    res.send('Failed to retrieve carrier data. Please try again.');
+    let errorMessage = 'Failed to retrieve carrier data. Please try again.';
+    if (error.response) {
+      console.error('API response error:', error.response.status, error.response.data);
+      errorMessage = `API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`;
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+      errorMessage = 'No response received from the API. Please try again later.';
+    } else if (error.code === 'ECONNABORTED') {
+      errorMessage = 'The request timed out. Please try again later.';
+    }
+    res.status(500).send(errorMessage);
   }
 });
 
