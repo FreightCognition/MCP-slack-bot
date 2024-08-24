@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
-const {SecretManagerServiceClient} = require('@google-cloud/secret-manager');
+const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -54,11 +54,15 @@ function getRiskLevel(points) {
   }
 }
 
-function getDetailsString(details) {
-  return Object.entries(details)
-    .filter(([key, value]) => key !== 'TotalPoints' && key !== 'OverallRating' && value !== 0)
-    .map(([key, value]) => `${key}: ${value} points`)
-    .join('\n');
+// Helper function to format infraction details
+function formatInfractions(infractions) {
+  if (!infractions || infractions.length === 0) {
+    return "No infractions found.";
+  }
+  return infractions.map(infraction => {
+    // Assuming each infraction object has properties like 'Source' and 'Description'
+    return `- ${infraction.Source}: ${infraction.Description}`; 
+  }).join('\n');
 }
 
 app.post('/slack/commands', async (req, res) => {
@@ -73,8 +77,8 @@ app.post('/slack/commands', async (req, res) => {
   try {
     console.log(`Fetching data for MC number: ${mcNumber}`);
     const response = await axios.post(
-      'https://mycarrierpacketsapi-stage.azurewebsites.net/api/v1/Carrier/PreviewCarrier', 
-      null, 
+      'https://mycarrierpacketsapi-stage.azurewebsites.net/api/v1/Carrier/PreviewCarrier',
+      null,
       {
         params: { docketNumber: mcNumber },
         headers: {
@@ -130,11 +134,41 @@ app.post('/slack/commands', async (req, res) => {
       }
     ];
 
-    // Add sections for each risk assessment category
-    const categories = ['Authority', 'Insurance', 'Operation', 'Safety', 'Other'];
+    // Add sections for each risk assessment category with enhanced details
+    const categories = ['Authority', 'Insurance', 'Operation', 'Safety', 'Other', 'MyCarrierProtect']; 
     categories.forEach(category => {
       const categoryData = data.RiskAssessmentDetails?.[category];
       if (categoryData) {
+        let detailsText = `Risk Level: ${getRiskLevel(categoryData.TotalPoints)} | Points: ${categoryData.TotalPoints}`;
+
+        // Add specific explanations based on category and risk level
+        switch (category) {
+          case 'Insurance':
+            if (categoryData.TotalPoints >= 1000) { 
+              // Assuming this logic is based on your portal's criteria
+              detailsText += '\nCert is on file and CertData cargo insurance deductible limit more than $5,000.';
+              // You might need to add more specific checks based on the API response
+            }
+            break;
+          case 'Safety':
+            // Assuming the API provides separate points for violations and unsafe driving
+            detailsText += `\nViolations: ${categoryData.Violations || 0} points`;
+            detailsText += `\nUnsafe Driving: ${categoryData.UnsafeDriving || 0} points`;
+            break;
+          case 'MyCarrierProtect':
+            if (categoryData.TotalPoints >= 1000) {
+              detailsText += '\nCarrier blocked by 3 or more companies.'; // Adjust based on API data
+              detailsText += '\nCarrier has a FreightValidate Review Recommended status.';
+            }
+            break;
+          default:
+            // For other categories, you can add similar logic if needed
+            break;
+        }
+
+        // Add formatted infractions
+        detailsText += `\nInfractions:\n${formatInfractions(categoryData.Infractions)}`;
+
         blocks.push(
           {
             type: "section",
@@ -148,7 +182,7 @@ app.post('/slack/commands', async (req, res) => {
             elements: [
               {
                 type: "mrkdwn",
-                text: `Risk Level: ${getRiskLevel(categoryData.TotalPoints)} | Points: ${categoryData.TotalPoints}\n${getDetailsString(categoryData)}`
+                text: detailsText
               }
             ]
           },
