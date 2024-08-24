@@ -30,26 +30,23 @@ async function initializeSecrets() {
   }
 }
 
-function getRiskLevelEmoji(riskLevel) {
-  switch (riskLevel) {
-    case 'Acceptable':
-      return '🟢';
-    case 'Moderate':
-      return '🟡';
-    case 'Review Required':
-      return '🟠';
-    case 'Fail':
-      return '🔴';
-    default:
-      return '⚪';
+function getRiskLevelEmoji(points) {
+  if (points >= 0 && points <= 249) {
+    return '🟢';
+  } else if (points >= 250 && points <= 999) {
+    return '🟡';
+  } else if (points >= 1000 && points <= 9999) {
+    return '🟠';
+  } else {
+    return '🔴';
   }
 }
 
 function getRiskLevel(points) {
   if (points >= 0 && points <= 249) {
-    return 'Acceptable';
+    return 'Low';
   } else if (points >= 250 && points <= 999) {
-    return 'Moderate';
+    return 'Medium';
   } else if (points >= 1000 && points <= 9999) {
     return 'Review Required';
   } else {
@@ -57,16 +54,13 @@ function getRiskLevel(points) {
   }
 }
 
-function formatNumber(number) {
-  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
+// Helper function to format infraction details
 function formatInfractions(infractions) {
   if (!infractions || infractions.length === 0) {
-    return "All rules passed";
+    return "No infractions found.";
   }
   return infractions.map(infraction => {
-    return `- ${infraction.Source}: ${infraction.Description}`; 
+    return `- ${infraction.RuleText}: ${infraction.RuleOutput} (${infraction.Points} points)`;
   }).join('\n');
 }
 
@@ -90,7 +84,7 @@ app.post('/slack/commands', async (req, res) => {
           Authorization: `Bearer ${BEARER_TOKEN}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000
+        timeout: 10000 // 10 seconds timeout
       }
     );
 
@@ -101,8 +95,6 @@ app.post('/slack/commands', async (req, res) => {
 
     const data = response.data[0];
     console.log(`Data received for MC number: ${mcNumber}`, JSON.stringify(data, null, 2));
-
-    const overallRiskLevel = getRiskLevel(data.RiskAssessmentDetails?.TotalPoints);
 
     const blocks = [
       {
@@ -124,7 +116,7 @@ app.post('/slack/commands', async (req, res) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Overall assessment:* ${getRiskLevelEmoji(overallRiskLevel)} ${overallRiskLevel}`
+          text: `*Overall assessment:* ${getRiskLevelEmoji(data.RiskAssessmentDetails?.TotalPoints)} ${getRiskLevel(data.RiskAssessmentDetails?.TotalPoints)}`
         }
       },
       {
@@ -132,7 +124,7 @@ app.post('/slack/commands', async (req, res) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Total Points: ${formatNumber(data.RiskAssessmentDetails?.TotalPoints || 0)}`
+            text: `Total Points: ${data.RiskAssessmentDetails?.TotalPoints || 'N/A'}`
           }
         ]
       },
@@ -141,44 +133,17 @@ app.post('/slack/commands', async (req, res) => {
       }
     ];
 
-    const categories = ['Authority', 'Insurance', 'Operation', 'Safety', 'MyCarrierProtect']; 
+    // Add sections for each risk assessment category with enhanced details
+    const categories = ['Authority', 'Insurance', 'Operation', 'Safety', 'Other'];
     categories.forEach(category => {
       const categoryData = data.RiskAssessmentDetails?.[category];
       if (categoryData) {
-        const riskLevel = getRiskLevel(categoryData.TotalPoints);
-        let detailsText = `Risk Level: ${riskLevel}, Points: ${formatNumber(categoryData.TotalPoints)}`;
+        let detailsText = `Risk Level: ${getRiskLevel(categoryData.TotalPoints)} | Points: ${categoryData.TotalPoints}`;
 
-        switch (category) {
-          case 'Authority':
-          case 'Operation':
-            detailsText = detailsText.replace('Low', 'Acceptable');
-            break;
-          case 'Insurance':
-            if (categoryData.TotalPoints >= 1000) {
-              detailsText += '\nCert is on file and CertData cargo insurance deductible limit more than $5,000.';
-              if (data.CargoInsuranceDeductible) {
-                detailsText += ` (Carrier's cargo insurance deductible limit is $${formatNumber(data.CargoInsuranceDeductible)}.)`
-              }
-            }
-            break;
-          case 'Safety':
-            if (data.TotalViolations && data.TotalViolations > 5) {
-              detailsText += `\nMore than 5 violations with a severity total weight of 8 or more (Carrier has ${data.TotalViolations} violations with a severity total weight of 8 or more.)`;
-            }
-            if (data.UnsafeDrivingViolations) {
-              detailsText += `\nUnsafe Driving with a severity total weight of 8 or more`;
-            }
-            break;
-          case 'MyCarrierProtect':
-            if (data.BlockedCompaniesCount && data.BlockedCompaniesCount >= 3) {
-              detailsText += `\nCarrier blocked by 3 or more companies (Carrier blocked by ${data.BlockedCompaniesCount} companies)`;
-            }
-            if (data.FreightValidateReviewRecommended) {
-              detailsText += '\nCarrier has a FreightValidate Review Recommended status';
-            }
-            break;
-        }
+        // Add specific explanations based on category and risk level (if needed)
+        // ... (You can add conditional logic here based on the API response)
 
+        // Add formatted infractions
         detailsText += `\nInfractions:\n${formatInfractions(categoryData.Infractions)}`;
 
         blocks.push(
@@ -186,7 +151,7 @@ app.post('/slack/commands', async (req, res) => {
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `*${category}:* ${getRiskLevelEmoji(riskLevel)} ${riskLevel}`
+              text: `*${category}:* ${getRiskLevelEmoji(categoryData.TotalPoints)} ${getRiskLevel(categoryData.TotalPoints)}`
             }
           },
           {
@@ -204,6 +169,55 @@ app.post('/slack/commands', async (req, res) => {
         );
       }
     });
+
+    // Add MyCarrierProtect section
+    const mcpData = { // Construct MyCarrierProtect data from relevant fields
+      TotalPoints: (data.IsBlocked ? 1000 : 0) + (data.FreightValidateStatus === 'Review Recommended' ? 1000 : 0), 
+      OverallRating: getRiskLevel((data.IsBlocked ? 1000 : 0) + (data.FreightValidateStatus === 'Review Recommended' ? 1000 : 0)),
+      Infractions: [] 
+    };
+    if (data.IsBlocked) {
+      mcpData.Infractions.push({
+        Points: 1000,
+        RiskLevel: 'Review Required',
+        RuleText: 'MyCarrierProtect: Blocked',
+        RuleOutput: 'Carrier blocked by 3 or more companies' // Adjust message as needed
+      });
+    }
+    if (data.FreightValidateStatus === 'Review Recommended') {
+      mcpData.Infractions.push({
+        Points: 1000,
+        RiskLevel: 'Review Required',
+        RuleText: 'FreightValidate Status',
+        RuleOutput: 'Carrier has a FreightValidate Review Recommended status'
+      });
+    }
+
+    if (mcpData.TotalPoints > 0) {
+      let mcpDetailsText = `Risk Level: ${mcpData.OverallRating} | Points: ${mcpData.TotalPoints}`;
+      mcpDetailsText += `\nInfractions:\n${formatInfractions(mcpData.Infractions)}`;
+      blocks.push(
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*MyCarrierProtect:* ${getRiskLevelEmoji(mcpData.TotalPoints)} ${mcpData.OverallRating}`
+          }
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: mcpDetailsText
+            }
+          ]
+        },
+        {
+          type: "divider"
+        }
+      );
+    }
 
     const slackResponse = {
       response_type: 'in_channel',
